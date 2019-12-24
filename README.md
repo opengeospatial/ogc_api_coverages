@@ -184,6 +184,84 @@ The third part is about query parameters:
 * http://acme.com/oapi/collections/{collectionid}/coverage/rangeset?SUBSET=Lat(40,50)&SUBSET=Long(10,20)  -- returns a coverage cutout between (40,10) and (50,20), in the coverage's Native Format
 * http://acme.com/oapi/collections/{collectionid}/coverage?SUBSET=time("2019-03-27")  -- returns a coverage slice at the timestamp given (in case the coverage is Lat/Long/time the result will be a 2D image)
 
+### Metadata and Coverage encoding
+
+When not specified otherwise, the metadata will be returned in CIS XML format where 
+applicable. Alternatively when the `Accept` header includes `application/json` at a
+higher relevance than `text/xml` then the CIS JSON encoding will be applied.
+
+Similarly, coverages are always returned in their native format (even when 
+subsetted) unless the `Accept` header is to set and another acceptable format is in
+the list. Additionally, encoding specific parameters can be passed as-well using 
+mime type parameters.
+
+For example, the following request expresses the intent to download the rangeset in
+a tiled and LZW-compressed TIFF file, but allows a fallback to a simple image/tiff 
+and NetCDF encoding.
+
+```http
+Accept: image/tiff; tiling=yes; tilewidth=128; tileheight=256; compress=LZW, image/tiff, application/netcdf
+```
+
+When using the TIFF encoding format the available parameters are documented in the
+[WCS 2.0 Specification - GeoTIFF Coverage Encoding Profile](https://portal.opengeospatial.org/files/?artifact_id=54813).
+It is not required to use the `GEOTIFF:` prefix for each parameter.
+
+When the full coverage access (metadata + data) is accessed, the encoding of the 
+parts can be controlled by mime type parameters too. Each part of the coverage 
+(domainset, rangetype, metadata, rangeset, etc.) is controllable by a mime type 
+parameter of the same name. Each parameter can contain a list of formats, just as
+using the `Accept` header value directly. The acceptable format description of the 
+part must be properly quoted if necessary to not interfere with the root `Accept`
+header description.
+
+The following example shows the usage of format description for parts of the 
+coverage. Note that not all parts are described, those parts are encoded in the 
+default format. As can be seen, multiple formats can be specified to allow for 
+encoding negotiation.
+```html
+Accept: multipart/related; domainset="application/json,text/xml" rangetype=text/xml; rangeset="image/tiff;interleave=Pixel"
+```
+
+The resulting multipart document must provide the overall `Content-Type` of `multipart/mixed` and the negotiated `Content-Type` for each part.
+
+E.g:
+
+```html
+server: gunicorn/19.9.0
+date: Tue, 18 Jun 2019 14:14:14 GMT
+connection: close
+content-length: 496897
+content-type: multipart/related; boundary=9db765ef886544b8928b0a9902dca366
+x-frame-options: SAMEORIGIN
+
+--9db765ef886544b8928b0a9902dca366
+Content-Type: text/xml
+Content-Length: 6354
+
+...
+
+--9db765ef886544b8928b0a9902dca366
+Content-Type: text/xml
+Content-Length: 1253
+
+...
+
+--9db765ef886544b8928b0a9902dca366
+Content-Type: text/xml
+Content-Length: 1993
+
+...
+
+--9db765ef886544b8928b0a9902dca366
+Content-Type: image/tiff
+Content-Disposition: attachment; filename="mosaic_MER_FRS_1PNPDE20060816_090929_000001972050_00222_23322_0058_RGB_reduced_20190618141413.tif"
+Content-Length: 486768
+
+...
+
+```
+
 ## Open Issues
 
 * Establish service parameter access, based on [OGC API - Common](https://github.com/opengeospatial/oapi_common)
